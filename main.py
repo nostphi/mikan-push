@@ -39,30 +39,43 @@ def main():
         print("Missing RSS_URL or PUSH_TOKEN")
         return
 
-    # 拉取 Mikan RSS
+    # 1. 初始化读取历史记录
+    history = get_history()
+    is_first_run = len(history) == 0
+
+    # 2. 拉取 Mikan RSS
     headers = {'User-Agent': 'Mozilla/5.0'}
     try:
         response = requests.get(RSS_URL, headers=headers, timeout=15)
         response.raise_for_status()
     except Exception as e:
         print(f"Failed to fetch RSS: {e}")
+        # 即使请求失败也确保生成文件
+        save_history(history)
         return
 
-    # 解析 XML
+    # 3. 解析 XML
     root = ET.fromstring(response.content)
     items = root.findall('./channel/item')
-    
-    if not items:
-        print("RSS feed is empty.")
-        return
 
-    # 测试模式：直接推送列表里最新的第 1 条番剧
-    latest_item = items[0]
-    title = latest_item.find('title').text if latest_item.find('title') is not None else '测试推送'
-    link = latest_item.find('link').text if latest_item.find('link') is not None else 'https://mikanani.me'
-    
-    print(f"Testing push for: {title}")
-    send_pushplus(f"[测试] {title}", link)
+    new_items = []
+    # 逆序处理，确保按时间先后顺序发送
+    for item in reversed(items):
+        title = item.find('title').text if item.find('title') is not None else ''
+        link = item.find('link').text if item.find('link') is not None else ''
+        guid = item.find('guid').text if item.find('guid') is not None else link
+
+        if guid not in history:
+            history.append(guid)
+            if not is_first_run:
+                # 非首次运行时推送
+                send_pushplus(title, link)
+            new_items.append(title)
+
+    # 仅保留最近 150 条历史记录并持久化
+    history = history[-150:]
+    save_history(history)
+    print(f"Check completed. Found {len(new_items)} new items.")
 
 if __name__ == '__main__':
     main()
