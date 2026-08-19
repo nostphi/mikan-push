@@ -2,9 +2,7 @@ name: Mikan RSS Auto Checker
 
 on:
   schedule:
-    # 每 15 分钟自动执行一次
     - cron: '*/15 * * * *'
-  # 支持在 GitHub 页面上手动点击测试
   workflow_dispatch:
 
 jobs:
