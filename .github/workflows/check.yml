@@ -1,0 +1,37 @@
+name: Mikan RSS Auto Checker
+
+on:
+  schedule:
+    # 每 15 分钟自动执行一次
+    - cron: '*/15 * * * *'
+  # 支持在 GitHub 页面上手动点击测试
+  workflow_dispatch:
+
+jobs:
+  check-feed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run check script
+        env:
+          RSS_URL: ${{ secrets.RSS_URL }}
+          PUSH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+        run: python main.py
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add history.json
+          git commit -m "Update feed history [skip ci]" || exit 0
+          git push
