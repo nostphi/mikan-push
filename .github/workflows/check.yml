@@ -1,13 +1,14 @@
 name: Mikan RSS Auto Checker
 
 on:
-  schedule:
-    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 jobs:
-  check-feed:
+  check-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -18,18 +19,20 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: pip install requests
+        run: |
+          pip install requests
 
       - name: Run check script
         env:
           RSS_URL: ${{ secrets.RSS_URL }}
           PUSH_TOKEN: ${{ secrets.PUSH_TOKEN }}
-        run: python main.py
+        run: |
+          python main.py
 
-      - name: Commit and push changes
+      - name: Commit and push if history updated
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add history.json
-          git commit -m "Update feed history [skip ci]" || exit 0
+          git commit -m "Update history [skip ci]" || exit 0
           git push
