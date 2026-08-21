@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import requests
 import xml.etree.ElementTree as ET
 
@@ -23,10 +24,8 @@ def save_history(history):
 def send_pushplus(title, content):
     url = "https://www.pushplus.plus/send"
     
-    # 限制标题长度在 90 字符以内，防止超过 PushPlus 100 字符限制被拒收
+    # 限制标题在 90 字符以内，防止超过 PushPlus 100 字符限制
     safe_title = (title[:85] + '...') if len(title) > 90 else title
-    
-    # 将完整标题附在正文内容前，保证微信点开能看到完整番剧名
     full_content = f"{title}\n\n{content}"
     
     payload = {
@@ -35,8 +34,9 @@ def send_pushplus(title, content):
         "content": full_content
     }
     headers = {"Content-Type": "application/json"}
+    
     try:
-        resp = requests.post(url, json=payload, timeout=10)
+        resp = requests.post(url, json=payload, headers=headers, timeout=10)
         print(f"Push status: {resp.text}")
     except Exception as e:
         print(f"Failed to push: {e}")
@@ -46,7 +46,7 @@ def main():
         print("Missing RSS_URL or PUSH_TOKEN")
         return
 
-    # 1. 初始化读取历史记录
+    # 1. 读取历史记录
     history = get_history()
     is_first_run = len(history) == 0
 
@@ -57,7 +57,6 @@ def main():
         response.raise_for_status()
     except Exception as e:
         print(f"Failed to fetch RSS: {e}")
-        # 即使请求失败也确保生成文件
         save_history(history)
         return
 
@@ -68,18 +67,22 @@ def main():
     new_items = []
     # 逆序处理，确保按时间先后顺序发送
     for item in reversed(items):
-        title = item.find('title').text if item.find('title') is not None else ''
-        link = item.find('link').text if item.find('link') is not None else ''
-        guid = item.find('guid').text if item.find('guid') is not None else link
+        title = item.find('title').text.strip() if item.find('title') is not None else ''
+        link = item.find('link').text.strip() if item.find('link') is not None else ''
+        guid_node = item.find('guid')
+        guid = guid_node.text.strip() if guid_node is not None else (link or title)
 
-        if guid not in history:
+        # 只要这个唯一标识没推送过
+        if guid and guid not in history:
             history.append(guid)
             if not is_first_run:
-                # 非首次运行时推送
+                print(f"Pushing: {title}")
                 send_pushplus(title, link)
+                # 关键：休眠 2 秒，防止多条连发触发 PushPlus 防刷丢包
+                time.sleep(2)
             new_items.append(title)
 
-    # 仅保留最近 150 条历史记录并持久化
+    # 保留最近 150 条记录
     history = history[-150:]
     save_history(history)
     print(f"Check completed. Found {len(new_items)} new items.")
