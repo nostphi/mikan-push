@@ -22,10 +22,17 @@ def save_history(history):
 
 def send_pushplus(title, content):
     url = "https://www.pushplus.plus/send"
+    
+    # 限制标题长度在 90 字符以内，防止超过 PushPlus 100 字符限制被拒收
+    safe_title = (title[:85] + '...') if len(title) > 90 else title
+    
+    # 将完整标题附在正文内容前，保证微信点开能看到完整番剧名
+    full_content = f"{title}\n\n{content}"
+    
     payload = {
         "token": PUSH_TOKEN,
-        "title": title,
-        "content": content
+        "title": safe_title,
+        "content": full_content
     }
     headers = {"Content-Type": "application/json"}
     try:
