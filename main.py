@@ -22,20 +22,50 @@ def save_history(history):
     with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
         json.dump(history, f, ensure_ascii=False, indent=2)
 
+def parse_anime_title(raw_title):
+    # 1. 移除开头所有的方括号/圆括号标签（字幕组信息）
+    clean = re.sub(r'^(\s*(\[[^\]]*\]|【[^】]*】|\([^\)]*\))\s*)+', '', raw_title).strip()
+    
+    # 2. 匹配集数特征：支持 " - 08", "[08]", "【08】", "EP08", "第08集"
+    ep_pattern = r'(?:-\s*|\[|【|\bEP|第)?\s*([0-9]{1,3}(?:\.[0-9])?)\s*(?:集|话|話|v\d+)?(?:\]|】)?'
+    # 优先匹配常见的 " - 08" 或末尾集数标记
+    match = re.search(r'(?:-\s*|EP|第)\s*([0-9]{1,3}(?:\.[0-9])?)\s*(?:集|话|話)?', clean, re.I)
+    if not match:
+        match = re.search(r'\[\s*([0-9]{1,3}(?:\.[0-9])?)\s*\]', clean)
+    
+    episode = match.group(1).zfill(2) if match else ""
+
+    # 3. 截取集数前面的番剧名主体
+    if match:
+        name_part = clean[:match.start()].strip()
+    else:
+        name_part = clean.split('[')[0].split('(')[0].strip()
+
+    # 4. 如果名字中包含多语言斜杠（例如：中文名 / 日文名 / 英文名），优先提取第一段中文名
+    if '/' in name_part:
+        name_part = name_part.split('/')[0].strip()
+    
+    # 去除名字末尾可能残留的连字符或多余符号
+    name_part = re.sub(r'[\s\-_]+$', '', name_part).strip()
+
+    # 5. 组合最终标题
+    if name_part and episode:
+        return f"{name_part} - {episode}"
+    elif name_part:
+        return name_part
+    return raw_title[:80]
+
 def send_pushplus(title, content):
     url = "https://www.pushplus.plus/send"
     
-    # 移除开头的第一个中括号内容（支持半角 [] 和全角 【】）
-    clean_title = re.sub(r'^\s*(\[[^\]]*\]|【[^】]*】)\s*', '', title)
+    # 提取 "中文名 - 集数"
+    parsed_title = parse_anime_title(title)
     
-    # 如果清洗后变空（极端情况），回退到原标题
-    clean_title = clean_title or title
-
-    # 限制标题在 90 字符以内，防止超过 PushPlus 限制
-    safe_title = (clean_title[:85] + '...') if len(clean_title) > 90 else clean_title
+    # 限制标题长度
+    safe_title = (parsed_title[:85] + '...') if len(parsed_title) > 90 else parsed_title
     
-    # 正文保留清洗后的标题及详情链接（也可以按需保留原始完整标题 title）
-    full_content = f"{clean_title}\n\n{content}"
+    # 正文保留完整原始发布标题与链接
+    full_content = f"【完整标题】\n{title}\n\n【详情链接】\n{content}"
     
     payload = {
         "token": PUSH_TOKEN,
@@ -46,7 +76,7 @@ def send_pushplus(title, content):
     
     try:
         resp = requests.post(url, json=payload, headers=headers, timeout=10)
-        print(f"Push status: {resp.text}")
+        print(f"Pushing [{safe_title}]: {resp.text}")
     except Exception as e:
         print(f"Failed to push: {e}")
 
