@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import re
 import requests
 import xml.etree.ElementTree as ET
 
@@ -24,9 +25,17 @@ def save_history(history):
 def send_pushplus(title, content):
     url = "https://www.pushplus.plus/send"
     
-    # 限制标题在 90 字符以内，防止超过 PushPlus 100 字符限制
-    safe_title = (title[:85] + '...') if len(title) > 90 else title
-    full_content = f"{title}\n\n{content}"
+    # 移除开头的第一个中括号内容（支持半角 [] 和全角 【】）
+    clean_title = re.sub(r'^\s*(\[[^\]]*\]|【[^】]*】)\s*', '', title)
+    
+    # 如果清洗后变空（极端情况），回退到原标题
+    clean_title = clean_title or title
+
+    # 限制标题在 90 字符以内，防止超过 PushPlus 限制
+    safe_title = (clean_title[:85] + '...') if len(clean_title) > 90 else clean_title
+    
+    # 正文保留清洗后的标题及详情链接（也可以按需保留原始完整标题 title）
+    full_content = f"{clean_title}\n\n{content}"
     
     payload = {
         "token": PUSH_TOKEN,
