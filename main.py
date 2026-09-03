@@ -23,32 +23,37 @@ def save_history(history):
         json.dump(history, f, ensure_ascii=False, indent=2)
 
 def parse_anime_title(raw_title):
-    # 1. 移除开头所有的方括号/圆括号标签（字幕组信息）
-    clean = re.sub(r'^(\s*(\[[^\]]*\]|【[^】]*】|\([^\)]*\))\s*)+', '', raw_title).strip()
+    # 1. 只剥离最开头的【第 1 个】字幕组方括号（支持半角 [] 和全角 【】）
+    # 这样即使番剧名也被括号包着（如 [幼女战记]），也不会被误删
+    clean = re.sub(r'^\s*(\[[^\]]*\]|【[^】]*】)\s*', '', raw_title).strip()
     
-    # 2. 匹配集数特征：支持 " - 08", "[08]", "【08】", "EP08", "第08集"
-    ep_pattern = r'(?:-\s*|\[|【|\bEP|第)?\s*([0-9]{1,3}(?:\.[0-9])?)\s*(?:集|话|話|v\d+)?(?:\]|】)?'
-    # 优先匹配常见的 " - 08" 或末尾集数标记
-    match = re.search(r'(?:-\s*|EP|第)\s*([0-9]{1,3}(?:\.[0-9])?)\s*(?:集|话|話)?', clean, re.I)
-    if not match:
-        match = re.search(r'\[\s*([0-9]{1,3}(?:\.[0-9])?)\s*\]', clean)
+    # 2. 优先匹配独立括号形式的集数，如 [09]、[09v2]、【09】
+    # 避免误匹配到年份 (2026) 或分辨率 (1080)
+    match_bracket = re.search(r'[\[【](?:EP|第)?\s*([0-9]{1,3}(?:\.[0-9])?)\s*(?:集|话|話|v\d+)?\s*[\]】]', clean, re.I)
     
+    # 3. 匹配连字符或显式集数形式，如 " - 09"、" EP09"、" 第09集"
+    match_hyphen = re.search(r'(?:-\s*|\bEP|\b第)\s*([0-9]{1,3}(?:\.[0-9])?)\s*(?:集|话|話)?', clean, re.I)
+
+    match = match_bracket or match_hyphen
     episode = match.group(1).zfill(2) if match else ""
 
-    # 3. 截取集数前面的番剧名主体
+    # 4. 截取集数前面的番剧名部分
     if match:
         name_part = clean[:match.start()].strip()
     else:
-        name_part = clean.split('[')[0].split('(')[0].strip()
+        name_part = clean
 
-    # 4. 如果名字中包含多语言斜杠（例如：中文名 / 日文名 / 英文名），优先提取第一段中文名
+    # 5. 清理番剧名两端可能遗留的方括号、圆括号（如从 [幼女战记...] 变成 幼女战记...）
+    name_part = name_part.strip('[]【】() ')
+
+    # 6. 如果中日英多语言混排（用 / 分割），只取第 1 个中文名
     if '/' in name_part:
         name_part = name_part.split('/')[0].strip()
-    
-    # 去除名字末尾可能残留的连字符或多余符号
+
+    # 清理末尾残留的连字符或空格
     name_part = re.sub(r'[\s\-_]+$', '', name_part).strip()
 
-    # 5. 组合最终标题
+    # 7. 组装标题
     if name_part and episode:
         return f"{name_part} - {episode}"
     elif name_part:
