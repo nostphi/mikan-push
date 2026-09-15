@@ -66,22 +66,25 @@ def send_pushplus(title, content):
     # 提取 "中文名 - 集数"
     parsed_title = parse_anime_title(title)
     
-    # 限制标题长度
+    # 限制标题长度在 90 字符以内，防止超出限制
     safe_title = (parsed_title[:85] + '...') if len(parsed_title) > 90 else parsed_title
     
     # 正文保留完整原始发布标题与链接
     full_content = f"【完整标题】\n{title}\n\n【详情链接】\n{content}"
     
+    # 按照新渠道要求配置参数
     payload = {
         "token": PUSH_TOKEN,
         "title": safe_title,
-        "content": full_content
+        "content": full_content,
+        "channel": "cmcc",
+        "template": "txt"
     }
     headers = {"Content-Type": "application/json"}
     
     try:
         resp = requests.post(url, json=payload, headers=headers, timeout=10)
-        print(f"Pushing [{safe_title}]: {resp.text}")
+        print(f"Pushing [{safe_title}] to cmcc: {resp.text}")
     except Exception as e:
         print(f"Failed to push: {e}")
 
