@@ -66,13 +66,15 @@ def send_pushplus(title, content):
     # 提取 "中文名 - 集数"
     parsed_title = parse_anime_title(title)
     
-    # 限制标题长度在 90 字符以内，防止超出限制
-    safe_title = (parsed_title[:85] + '...') if len(parsed_title) > 90 else parsed_title
+    # 加上简洁明确的通知前缀，既清晰又可避免被 5G 消息当作用户提问拦截
+    final_title = f"【新番】{parsed_title}"
     
-    # 正文保留完整原始发布标题与链接
-    full_content = f"【完整标题】\n{title}\n\n【详情链接】\n{content}"
+    # 限制标题长度在 90 字符以内
+    safe_title = (final_title[:85] + '...') if len(final_title) > 90 else final_title
     
-    # 按照新渠道要求配置参数
+    # 正文同样采用简洁结构
+    full_content = f"{title}\n\n链接: {content}"
+    
     payload = {
         "token": PUSH_TOKEN,
         "title": safe_title,
