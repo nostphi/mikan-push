@@ -70,7 +70,7 @@ def send_pushplus(title, content):
     safe_title = (parsed_title[:85] + '...') if len(parsed_title) > 90 else parsed_title
     
     # 正文只保留完整原始发布标题，去掉详情链接
-    full_content = f"【完整标题】\n{title}"
+    full_content = f"{title}"
     
     # 按照新渠道要求配置参数
     payload = {
