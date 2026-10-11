@@ -69,8 +69,8 @@ def send_pushplus(title, content):
     # 限制标题长度在 90 字符以内，防止超出限制
     safe_title = (parsed_title[:85] + '...') if len(parsed_title) > 90 else parsed_title
     
-    # 正文保留完整原始发布标题与链接
-    full_content = f"【完整标题】\n{title}\n\n【详情链接】\n{content}"
+    # 正文只保留完整原始发布标题，去掉详情链接
+    full_content = f"【完整标题】\n{title}"
     
     # 按照新渠道要求配置参数
     payload = {
